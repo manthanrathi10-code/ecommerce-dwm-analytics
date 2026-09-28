@@ -69,9 +69,14 @@ def get_slice(dimension: str, value: str, db: Session):
     
     model, column, join_cond = DIMENSION_MAP[dimension_key]
     
+    if dimension_key in ['location', 'category', 'payment_method']:
+        filter_cond = func.lower(func.trim(column)) == value.strip().lower()
+    else:
+        filter_cond = column == value
+        
     query = db.query(column.label(dimension_key), func.sum(FactSales.total_amount).label('revenue')) \
               .join(model, join_cond) \
-              .filter(column == value) \
+              .filter(filter_cond) \
               .group_by(column)
               
     results = query.all()
@@ -88,10 +93,17 @@ def get_dice(dimension1: str, value1: str, dimension2: str, value2: str, db: Ses
     model1, col1, join1 = DIMENSION_MAP[dim1_key]
     model2, col2, join2 = DIMENSION_MAP[dim2_key]
     
+    filter_conds = []
+    for dim_key, col, val in [(dim1_key, col1, value1), (dim2_key, col2, value2)]:
+        if dim_key in ['location', 'category', 'payment_method']:
+            filter_conds.append(func.lower(func.trim(col)) == val.strip().lower())
+        else:
+            filter_conds.append(col == val)
+    
     query = db.query(col1.label(dim1_key), col2.label(dim2_key), func.sum(FactSales.total_amount).label('revenue')) \
               .join(model1, join1) \
               .join(model2, join2) \
-              .filter(col1 == value1, col2 == value2) \
+              .filter(*filter_conds) \
               .group_by(col1, col2)
               
     results = query.all()
