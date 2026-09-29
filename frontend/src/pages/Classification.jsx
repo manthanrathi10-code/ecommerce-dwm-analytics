@@ -30,6 +30,7 @@ const CustomBarTooltip = ({ active, payload }) => {
 };
 
 const Classification = () => {
+  const [algorithm, setAlgorithm] = useState('random_forest');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
@@ -38,7 +39,7 @@ const Classification = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await miningApi.getClassification();
+      const res = await miningApi.getClassification({ algorithm });
       if (!res.success) throw new Error(res.message || 'Failed to fetch classification metrics');
       setData(res.data);
     } catch (err) {
@@ -50,7 +51,7 @@ const Classification = () => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [algorithm]);
 
   if (loading) return <LoadingState message="Training and evaluating classification model..." />;
   if (error) return <ErrorState message={error} onRetry={fetchData} />;
@@ -80,8 +81,22 @@ const Classification = () => {
         </div>
 
         <div className="header-action-pills">
+          <select 
+            className="badge badge-neutral" 
+            style={{ backgroundColor: '#F3F4F6', color: '#374151', border: 'none', outline: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.8rem', padding: '0.3rem 0.6rem' }}
+            value={algorithm}
+            onChange={(e) => setAlgorithm(e.target.value)}
+            disabled={loading}
+          >
+            <option value="random_forest">Random Forest</option>
+            <option value="decision_tree">Decision Tree</option>
+            <option value="logistic_regression">Logistic Regression</option>
+            <option value="knn">KNN</option>
+            <option value="svm">SVM</option>
+            <option value="naive_bayes">Naive Bayes</option>
+          </select>
           <span className="badge badge-primary">
-            <Cpu size={13} /> {data.model_name || "Tuned Random Forest Classifier"}
+            <Cpu size={13} /> {data.model_name || "Classifier"}
           </span>
           {cvPct && (
             <span className="badge badge-neutral" style={{ backgroundColor: '#F3F4F6', color: '#374151' }}>

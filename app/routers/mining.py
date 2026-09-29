@@ -16,8 +16,8 @@ def get_regression():
     return mining.get_regression()
 
 @router.get("/classification")
-def get_classification():
-    return mining.get_classification()
+def get_classification(algorithm: str = 'random_forest'):
+    return mining.get_classification(algorithm)
 
 @router.get("/attribute-relevance")
 def get_attribute_relevance():

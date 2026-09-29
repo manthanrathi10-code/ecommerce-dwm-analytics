@@ -4,8 +4,38 @@ from mlxtend.frequent_patterns import apriori, association_rules
 from app.database import engine
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+from sklearn.naive_bayes import GaussianNB
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import make_pipeline
+
+def get_classifier(selected_algorithm):
+    if selected_algorithm == 'decision_tree':
+        return DecisionTreeClassifier(random_state=42), "Decision Tree Classifier"
+    elif selected_algorithm == 'logistic_regression':
+        return make_pipeline(StandardScaler(), LogisticRegression(random_state=42, max_iter=1000)), "Logistic Regression"
+    elif selected_algorithm == 'knn':
+        return make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=5)), "K-Nearest Neighbors"
+    elif selected_algorithm == 'svm':
+        return make_pipeline(StandardScaler(), SVC(random_state=42)), "Support Vector Machine"
+    elif selected_algorithm == 'naive_bayes':
+        return GaussianNB(), "Naive Bayes Classifier"
+    else:
+        model = RandomForestClassifier(
+            n_estimators=100,
+            max_depth=None,
+            min_samples_split=2,
+            min_samples_leaf=1,
+            max_features='sqrt',
+            random_state=42
+        )
+        return model, "Tuned Random Forest Classifier"
+
 
 def get_clusters(n_clusters: int = 3):
     query = """
@@ -71,9 +101,7 @@ def get_regression():
         "r2_score": float(score)
     }
 
-from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
-
-def get_classification():
+def get_classification(algorithm: str = 'random_forest'):
     query = """
         SELECT 
             c.customer_key,
@@ -141,16 +169,9 @@ def get_classification():
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 
-    # Tuned Random Forest Classifier via Stratified Cross-Validation
+    # Tuned Cross-Validation
+    model, model_name = get_classifier(algorithm)
     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
-    model = RandomForestClassifier(
-        n_estimators=100,
-        max_depth=None,
-        min_samples_split=2,
-        min_samples_leaf=1,
-        max_features='sqrt',
-        random_state=42
-    )
     cv_scores = cross_val_score(model, X_train, y_train, cv=cv, scoring='accuracy')
     cv_score = float(cv_scores.mean())
 
@@ -162,6 +183,19 @@ def get_classification():
     recall = recall_score(y_test, y_pred, zero_division=0)
     f1 = f1_score(y_test, y_pred, zero_division=0)
     cm = confusion_matrix(y_test, y_pred).tolist()
+    
+    if hasattr(model, 'feature_importances_'):
+        importances = model.feature_importances_.tolist()
+    elif hasattr(model, 'named_steps'):
+        classifier = model.named_steps[model.steps[-1][0]]
+        if hasattr(classifier, 'feature_importances_'):
+            importances = classifier.feature_importances_.tolist()
+        elif hasattr(classifier, 'coef_'):
+            importances = [abs(x) for x in classifier.coef_[0].tolist()]
+        else:
+            importances = [0.0] * len(X.columns)
+    else:
+        importances = [0.0] * len(X.columns)
 
     return {
         "accuracy": float(accuracy),
@@ -170,8 +204,8 @@ def get_classification():
         "f1_score": float(f1),
         "confusion_matrix": cm,
         "feature_names": list(X.columns),
-        "feature_importances": model.feature_importances_.tolist(),
-        "model_name": "Tuned Random Forest Classifier",
+        "feature_importances": importances,
+        "model_name": model_name,
         "cv_score": cv_score
     }
 
