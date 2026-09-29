@@ -23,7 +23,7 @@ def list_products(category: Optional[str] = None):
     
     params = {}
     if category:
-        query += " WHERE p.category = %(category)s "
+        query += " WHERE LOWER(TRIM(p.category)) = LOWER(TRIM(%(category)s)) "
         params['category'] = category
         
     query += " GROUP BY p.product_id, p.product_name, p.category ORDER BY revenue DESC "
